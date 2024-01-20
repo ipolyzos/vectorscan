@@ -1,3 +1,13 @@
+vectorscan (5.4.11-2) unstable; urgency=medium
+
+  * Make build reproducible: Closes: #1056649
+    Thanks to Chris Lamb <lamby@debian.org> for the patch
+  * Set ppc64le target arch to power8, as that's the port's default. Caused
+    a SIGILL on Debian's CI:
+    https://ci.debian.net/packages/v/vectorscan/testing/ppc64el/41889410/
+
+ -- Konstantinos Margaritis <markos@debian.org>  Sat, 20 Jan 2024 23:26:19 +0200
+
 vectorscan (5.4.11-1) unstable; urgency=medium
 
   * New upstream release
