@@ -104,7 +104,7 @@ m128 getInitState(const struct FDR *fdr, u8 len_history, const u64a *ft,
     return s;
 }
 
-#include "../print_simd.h"
+//#include "../print_simd.h"
 
 static really_inline
 void get_conf_stride_1(const u8 *itPtr, UNUSED const u8 *start_ptr,
@@ -158,21 +158,50 @@ void get_conf_stride_1(const u8 *itPtr, UNUSED const u8 *start_ptr,
     store128(&reach[12], reach_v[3]);
 
     m128 st0  = load_m128_from_u64a(ft + reach[0]);
-    m128 st4  = load_m128_from_u64a(ft + reach[1]);
-    m128 st8  = load_m128_from_u64a(ft + reach[2]);
-    m128 st12 = load_m128_from_u64a(ft + reach[3]);
     m128 st1  = load_m128_from_u64a(ft + reach[4]);
-    m128 st5  = load_m128_from_u64a(ft + reach[5]);
-    m128 st9  = load_m128_from_u64a(ft + reach[6]);
-    m128 st13 = load_m128_from_u64a(ft + reach[7]);
+    st1  = lshiftbyte_m128(st1, 1);
+    st0 = or128(st0, st1);
+
     m128 st2  = load_m128_from_u64a(ft + reach[8]);
-    m128 st6  = load_m128_from_u64a(ft + reach[9]);
-    m128 st10 = load_m128_from_u64a(ft + reach[10]);
-    m128 st14 = load_m128_from_u64a(ft + reach[11]);
+    st2  = lshiftbyte_m128(st2, 2);
     m128 st3  = load_m128_from_u64a(ft + reach[12]);
+    st3  = lshiftbyte_m128(st3, 3);
+    st2 = or128(st2, st3);
+
+    m128 st4  = load_m128_from_u64a(ft + reach[1]);
+    st4  = lshiftbyte_m128(st4, 4);
+    m128 st5  = load_m128_from_u64a(ft + reach[5]);
+    st5  = lshiftbyte_m128(st5, 5);
+    st4 = or128(st4, st5);
+
+    m128 st6  = load_m128_from_u64a(ft + reach[9]);
+    st6  = lshiftbyte_m128(st6, 6);
     m128 st7  = load_m128_from_u64a(ft + reach[13]);
+    st7  = lshiftbyte_m128(st7, 7);
+    st6 = or128(st6, st7);
+
+    m128 st8  = load_m128_from_u64a(ft + reach[2]);
+    m128 st9  = load_m128_from_u64a(ft + reach[6]);
+    st9  = lshiftbyte_m128(st9, 1);
+    st8 = or128(st8, st9);
+
+    m128 st10 = load_m128_from_u64a(ft + reach[10]);
+    st10 = lshiftbyte_m128(st10, 2);
     m128 st11 = load_m128_from_u64a(ft + reach[14]);
+    st11 = lshiftbyte_m128(st11, 3);
+    st10 = or128(st10, st11);
+
+    m128 st12 = load_m128_from_u64a(ft + reach[3]);
+    st12 = lshiftbyte_m128(st12, 4);
+    m128 st13 = load_m128_from_u64a(ft + reach[7]);
+    st13 = lshiftbyte_m128(st13, 5);
+    st12 = or128(st12, st13);
+
+    m128 st14 = load_m128_from_u64a(ft + reach[11]);
+    st14 = lshiftbyte_m128(st14, 6);
     m128 st15 = load_m128_from_u64a(ft + reach[15]);
+    st15 = lshiftbyte_m128(st15, 7);
+    st14 = or128(st14, st15);
     // m128 st0  = load_m128_from_u64a((u64a *)reach[0]);
     // m128 st4  = load_m128_from_u64a((u64a *)reach[1]);
     // m128 st8  = load_m128_from_u64a((u64a *)reach[2]);
@@ -190,42 +219,19 @@ void get_conf_stride_1(const u8 *itPtr, UNUSED const u8 *start_ptr,
     // m128 st11 = load_m128_from_u64a((u64a *)reach[14]);
     // m128 st15 = load_m128_from_u64a((u64a *)reach[15]);
     
-    st1  = lshiftbyte_m128(st1, 1);
-    st2  = lshiftbyte_m128(st2, 2);
-    st3  = lshiftbyte_m128(st3, 3);
-    st4  = lshiftbyte_m128(st4, 4);
-    st5  = lshiftbyte_m128(st5, 5);
-    st6  = lshiftbyte_m128(st6, 6);
-    st7  = lshiftbyte_m128(st7, 7);
-    st9  = lshiftbyte_m128(st9, 1);
-    st10 = lshiftbyte_m128(st10, 2);
-    st11 = lshiftbyte_m128(st11, 3);
-    st12 = lshiftbyte_m128(st12, 4);
-    st13 = lshiftbyte_m128(st13, 5);
-    st14 = lshiftbyte_m128(st14, 6);
-    st15 = lshiftbyte_m128(st15, 7);
 
-    st0 = or128(st0, st1);
-    st2 = or128(st2, st3);
-    st4 = or128(st4, st5);
-    st6 = or128(st6, st7);
     st0 = or128(st0, st2);
     st4 = or128(st4, st6);
     st0 = or128(st0, st4);
-
-    st8 = or128(st8, st9);
-    st10 = or128(st10, st11);
-    st12 = or128(st12, st13);
-    st14 = or128(st14, st15);
+    m128 st = or128(*s, st0);
+    *conf0 = movq(st) ^ ~0ULL;
+    st = rshiftbyte_m128(st, 8);
+   
     st8 = or128(st8, st10);
     st12 = or128(st12, st14);
     st8 = or128(st8, st12);
 
-    m128 st = or128(*s, st0);
-    *conf0 = movq(st) ^ ~0ULL;
-    st = rshiftbyte_m128(st, 8);
     st = or128(st, st8);
-
     *conf8 = movq(st) ^ ~0ULL;
     *s = rshiftbyte_m128(st, 8);
 }
