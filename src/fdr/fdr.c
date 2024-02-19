@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2017, Intel Corporation
+ * Copyright (c) 2020-2024, VectorCamp PC
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -103,6 +104,7 @@ m128 getInitState(const struct FDR *fdr, u8 len_history, const u64a *ft,
     return s;
 }
 
+#include "../print_simd.h"
 
 static really_inline
 void get_conf_stride_1(const u8 *itPtr, UNUSED const u8 *start_ptr,
@@ -111,41 +113,97 @@ void get_conf_stride_1(const u8 *itPtr, UNUSED const u8 *start_ptr,
     /* +1: the zones ensure that we can read the byte at z->end */
     assert(itPtr >= start_ptr && itPtr + ITER_BYTES <= end_ptr);
 
-    u64a it_hi = *(const u64a *)itPtr;
-    u64a it_lo = *(const u64a *)(itPtr + 8);
-    u64a reach0  = domain_mask & it_hi;
-    u64a reach1  = domain_mask & (it_hi >> 8);
-    u64a reach2  = domain_mask & (it_hi >> 16);
-    u64a reach3  = domain_mask & (it_hi >> 24);
-    u64a reach4  = domain_mask & (it_hi >> 32);
-    u64a reach5  = domain_mask & (it_hi >> 40);
-    u64a reach6  = domain_mask & (it_hi >> 48);
-    u64a reach7  = domain_mask & ((it_hi >> 56) | (it_lo << 8));
-    u64a reach8  = domain_mask & it_lo;
-    u64a reach9  = domain_mask & (it_lo >> 8);
-    u64a reach10 = domain_mask & (it_lo >> 16);
-    u64a reach11 = domain_mask & (it_lo >> 24);
-    u64a reach12 = domain_mask & (it_lo >> 32);
-    u64a reach13 = domain_mask & (it_lo >> 40);
-    u64a reach14 = domain_mask & (it_lo >> 48);
-    u64a reach15 = domain_mask & unaligned_load_u32(itPtr + 15);
+    // u64a ALIGN_ATTR(16) reach[16];
+    u32 ALIGN_ATTR(16) reach[16];
 
-    m128 st0  = load_m128_from_u64a(ft + reach0);
-    m128 st1  = lshiftbyte_m128(load_m128_from_u64a(ft + reach1), 1);
-    m128 st2  = lshiftbyte_m128(load_m128_from_u64a(ft + reach2), 2);
-    m128 st3  = lshiftbyte_m128(load_m128_from_u64a(ft + reach3), 3);
-    m128 st4  = lshiftbyte_m128(load_m128_from_u64a(ft + reach4), 4);
-    m128 st5  = lshiftbyte_m128(load_m128_from_u64a(ft + reach5), 5);
-    m128 st6  = lshiftbyte_m128(load_m128_from_u64a(ft + reach6), 6);
-    m128 st7  = lshiftbyte_m128(load_m128_from_u64a(ft + reach7), 7);
-    m128 st8  = load_m128_from_u64a(ft + reach8);
-    m128 st9  = lshiftbyte_m128(load_m128_from_u64a(ft + reach9), 1);
-    m128 st10 = lshiftbyte_m128(load_m128_from_u64a(ft + reach10), 2);
-    m128 st11 = lshiftbyte_m128(load_m128_from_u64a(ft + reach11), 3);
-    m128 st12 = lshiftbyte_m128(load_m128_from_u64a(ft + reach12), 4);
-    m128 st13 = lshiftbyte_m128(load_m128_from_u64a(ft + reach13), 5);
-    m128 st14 = lshiftbyte_m128(load_m128_from_u64a(ft + reach14), 6);
-    m128 st15 = lshiftbyte_m128(load_m128_from_u64a(ft + reach15), 7);
+    m128 domain_mask_v = set1_4x32(domain_mask);
+    // m256 ft_v = set1_4x64((ptrdiff_t)ft);
+    
+    m128 it_v = loadu128(itPtr);
+    m128 it_shifted8_v = rshiftbyte_m128(it_v, 1);
+    m128 it_shifted16_v = rshiftbyte_m128(it_v, 2);
+    m128 it_shifted24_v = rshiftbyte_m128(it_v, 3);
+    it_shifted24_v = insert32_m128(it_shifted24_v, unaligned_load_u32(itPtr + 15), 3);
+
+    m128 reach_v[4];
+    // m256 reach64_v[4];
+
+    reach_v[0] = and128(domain_mask_v, it_v);
+    reach_v[1] = and128(domain_mask_v, it_shifted8_v);
+    reach_v[2] = and128(domain_mask_v, it_shifted16_v);
+    reach_v[3] = and128(domain_mask_v, it_shifted24_v);
+
+    // reach_v[0] = lshift32_m128(reach_v[0], 3);
+    // reach_v[1] = lshift32_m128(reach_v[1], 3);
+    // reach_v[2] = lshift32_m128(reach_v[2], 3);
+    // reach_v[3] = lshift32_m128(reach_v[3], 3);
+
+    // reach64_v[0] = widen128(reach_v[0]);
+    // reach64_v[1] = widen128(reach_v[1]);
+    // reach64_v[2] = widen128(reach_v[2]);
+    // reach64_v[3] = widen128(reach_v[3]);
+
+    // reach64_v[0] = add256(reach64_v[0], ft_v);
+    // reach64_v[1] = add256(reach64_v[1], ft_v);
+    // reach64_v[2] = add256(reach64_v[2], ft_v);
+    // reach64_v[3] = add256(reach64_v[3], ft_v);
+
+    // store256(&reach[0], reach64_v[0]);
+    // store256(&reach[4], reach64_v[1]);
+    // store256(&reach[8], reach64_v[2]);
+    // store256(&reach[12], reach64_v[3]);
+    store128(&reach[0], reach_v[0]);
+    store128(&reach[4], reach_v[1]);
+    store128(&reach[8], reach_v[2]);
+    store128(&reach[12], reach_v[3]);
+
+    m128 st0  = load_m128_from_u64a(ft + reach[0]);
+    m128 st4  = load_m128_from_u64a(ft + reach[1]);
+    m128 st8  = load_m128_from_u64a(ft + reach[2]);
+    m128 st12 = load_m128_from_u64a(ft + reach[3]);
+    m128 st1  = load_m128_from_u64a(ft + reach[4]);
+    m128 st5  = load_m128_from_u64a(ft + reach[5]);
+    m128 st9  = load_m128_from_u64a(ft + reach[6]);
+    m128 st13 = load_m128_from_u64a(ft + reach[7]);
+    m128 st2  = load_m128_from_u64a(ft + reach[8]);
+    m128 st6  = load_m128_from_u64a(ft + reach[9]);
+    m128 st10 = load_m128_from_u64a(ft + reach[10]);
+    m128 st14 = load_m128_from_u64a(ft + reach[11]);
+    m128 st3  = load_m128_from_u64a(ft + reach[12]);
+    m128 st7  = load_m128_from_u64a(ft + reach[13]);
+    m128 st11 = load_m128_from_u64a(ft + reach[14]);
+    m128 st15 = load_m128_from_u64a(ft + reach[15]);
+    // m128 st0  = load_m128_from_u64a((u64a *)reach[0]);
+    // m128 st4  = load_m128_from_u64a((u64a *)reach[1]);
+    // m128 st8  = load_m128_from_u64a((u64a *)reach[2]);
+    // m128 st12 = load_m128_from_u64a((u64a *)reach[3]);
+    // m128 st1  = load_m128_from_u64a((u64a *)reach[4]);
+    // m128 st5  = load_m128_from_u64a((u64a *)reach[5]);
+    // m128 st9  = load_m128_from_u64a((u64a *)reach[6]);
+    // m128 st13 = load_m128_from_u64a((u64a *)reach[7]);
+    // m128 st2  = load_m128_from_u64a((u64a *)reach[8]);
+    // m128 st6  = load_m128_from_u64a((u64a *)reach[9]);
+    // m128 st10 = load_m128_from_u64a((u64a *)reach[10]);
+    // m128 st14 = load_m128_from_u64a((u64a *)reach[11]);
+    // m128 st3  = load_m128_from_u64a((u64a *)reach[12]);
+    // m128 st7  = load_m128_from_u64a((u64a *)reach[13]);
+    // m128 st11 = load_m128_from_u64a((u64a *)reach[14]);
+    // m128 st15 = load_m128_from_u64a((u64a *)reach[15]);
+    
+    st1  = lshiftbyte_m128(st1, 1);
+    st2  = lshiftbyte_m128(st2, 2);
+    st3  = lshiftbyte_m128(st3, 3);
+    st4  = lshiftbyte_m128(st4, 4);
+    st5  = lshiftbyte_m128(st5, 5);
+    st6  = lshiftbyte_m128(st6, 6);
+    st7  = lshiftbyte_m128(st7, 7);
+    st9  = lshiftbyte_m128(st9, 1);
+    st10 = lshiftbyte_m128(st10, 2);
+    st11 = lshiftbyte_m128(st11, 3);
+    st12 = lshiftbyte_m128(st12, 4);
+    st13 = lshiftbyte_m128(st13, 5);
+    st14 = lshiftbyte_m128(st14, 6);
+    st15 = lshiftbyte_m128(st15, 7);
 
     st0 = or128(st0, st1);
     st2 = or128(st2, st3);
