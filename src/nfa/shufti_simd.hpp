@@ -208,7 +208,7 @@ const u8 *check_last_byte(SuperVector<S> mask2_lo, SuperVector<S> mask2_hi,
     uint8_t last_elem = mask.u.u8[mask_len - 1];
 
     SuperVector<S> reduce = mask2_lo | mask2_hi;
-    for(uint16_t i = S; i > 2; i/=2) {
+    for(uint16_t i = S; i >= 2; i/=2) {
         reduce = reduce | reduce.vshr(i/2);
     }
     uint8_t match_inverted = reduce.u.u8[0] | last_elem;
@@ -260,7 +260,6 @@ const u8 *shuftiDoubleExecReal(m128 mask1_lo, m128 mask1_hi, m128 mask2_lo, m128
             first_char_mask.print8("inout_c1 shifted");
         }
 
-        first_char_mask = SuperVector<S>::Ones();
         while(d + S <= buf_end) {
             __builtin_prefetch(d + 64);
             DEBUG_PRINTF("d %p \n", d);
