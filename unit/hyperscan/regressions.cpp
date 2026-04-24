@@ -463,3 +463,39 @@ TEST(ArmRegression, NoDotAll_Long) {
     hs_free_scratch(scratch);
     hs_free_database(db);
 }
+
+
+TEST(utf8, charclass_issue_326) {
+    /*
+     * This is a modified test case from https://github.com/VectorCamp/vectorscan/issues/326
+     * It includes both test patterns mentioned in the issue.
+     */
+    vector<pattern> unicode_patterns = {
+    pattern(R"(\x{ff15}\x{ff10}\x{ff17}\x{ff15}\x{ff10}[\x{ff10}-\x{ff19}]{7})",
+        HS_FLAG_DOTALL | HS_FLAG_PREFILTER | HS_FLAG_MULTILINE | HS_FLAG_CASELESS | HS_FLAG_UCP | HS_FLAG_UTF8, 1),
+    pattern(R"(NL[0-9\x{ff10}-\x{ff19}]{2}[A-Z\x{ff21}-\x{ff3a}a-z\x{ff41}-\x{ff5a}]{4}[0-9\x{ff10}-\x{ff19}]{10})",
+        HS_FLAG_PREFILTER | HS_FLAG_SINGLEMATCH| HS_FLAG_UTF8, 2)
+    };
+    const char *data1 = "５０７５０７８３２４０１";
+    const char *data2 = "NL２０INGB０００１２３４567";
+
+    hs_database_t *db = buildDB(unicode_patterns, HS_MODE_NOSTREAM);
+    ASSERT_NE(nullptr, db);
+
+    hs_scratch_t *scratch = nullptr;
+    hs_error_t err = hs_alloc_scratch(db, &scratch);
+    ASSERT_EQ(HS_SUCCESS, err);
+
+    CallBackContext c1, c2;
+    err = hs_scan(db, data1, strlen(data1), 0, scratch, record_cb, reinterpret_cast<void *>(&c1));
+    ASSERT_EQ(HS_SUCCESS, err);
+    
+    err = hs_scan(db, data2, strlen(data2), 0, scratch, record_cb, reinterpret_cast<void *>(&c2));
+    ASSERT_EQ(HS_SUCCESS, err);
+
+    ASSERT_EQ(MatchRecord(36, 1), c1.matches[0]);
+    ASSERT_EQ(MatchRecord(36, 2), c2.matches[0]);
+    err = hs_free_scratch(scratch);
+    ASSERT_EQ(HS_SUCCESS, err);
+    hs_free_database(db);
+}
